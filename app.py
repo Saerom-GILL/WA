@@ -18,36 +18,36 @@ except FileNotFoundError:
 
 genai.configure(api_key=api_key)
 
-# 3. 모델 설정 (Flash 모델의 게으름 방지 세팅)
-# temperature=0 : 창의성을 0으로 낮춰서 사실 기반 분석력 극대화
+# 3. 안전 설정 (중요: 출력이 중간에 멈추는 것을 방지하기 위해 필터 해제)
+safety_settings = [
+    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+]
+
+# 4. 모델 설정 (토큰 최대치 8192로 확장)
 generation_config = {
-    "temperature": 0.0,
+    "temperature": 0.0,        # 창의성 0 (분석 모드)
     "top_p": 1.0,
-    "max_output_tokens": 4096,
+    "max_output_tokens": 8192, # <--- 여기가 핵심입니다. 텍스트가 잘리지 않게 최대치로 설정.
 }
 
-# 모델 선택 (1.5 Flash가 가성비/속도 최적. 필요시 'gemini-1.5-pro-001'로 변경)
-model = genai.GenerativeModel(
-    model_name='models/gemini-2.5-flash', 
-    generation_config=generation_config
-)
-
-# 4. 시스템 프롬프트 (Lazy 현상 방지 + 전수 조사 강제)
+# 5. 시스템 프롬프트 (OCR 누락 방지 + 구역별 스캔 강제)
 SYSTEM_PROMPT = """
-[SYSTEM SETTING: ANALYTICAL MODE]
-당신은 엄격한 'KWCAG 정보접근성 품질 관리관'입니다. 
-당신의 목표는 이미지 내의 '모든' 텍스트를 전수 조사하여 명도 대비 위반 사항을 단 하나도 빠짐없이 찾아내는 것입니다.
+[SYSTEM SETTING: RIGOROUS INSPECTION MODE]
+당신은 'KWCAG 정보접근성 품질 관리관'입니다. 
+당신의 목표는 이미지 내의 텍스트를 **완전히 끝까지 읽어내고(Full OCR)**, 명도 대비 위반 사항을 **하나도 빠짐없이 전수 조사**하는 것입니다.
 
-**[분석 알고리즘 - 반드시 이 순서대로 사고할 것]**
-1. **공간 스캔:** 이미지를 상단, 중단, 하단, 좌우로 나누어 시선을 이동하며 모든 텍스트 덩어리를 찾으십시오.
-2. **개별 검증:** 찾은 모든 텍스트 덩어리에 대해 각각 배경색과 글자색의 명도 대비(4.5:1)를 확인하십시오.
-3. **위반 누적:** 위반 사항이 발견되면 즉시 멈추지 말고 리스트에 계속 추가하십시오. (절대 하나만 찾고 끝내지 마십시오.)
-4. **최종 출력:** 누적된 모든 위반 사항을 보고하십시오.
+**[OCR 추출 절대 원칙]**
+1. 요약하지 마십시오. 이미지에 있는 모든 글자를 있는 그대로 가져오십시오.
+2. 중간에 멈추지 마십시오. 글자가 1000자가 넘어도 끝까지 출력하십시오.
+3. 표나 리스트가 있다면 그 구조를 유지하며 텍스트를 추출하십시오.
 
-**[절대 금지 사항]**
-- "대표적인 예시로..."라며 하나만 지적하고 끝내기 금지.
-- 질문, 잡담, 서론, 맺음말 절대 금지.
-- 무조건 한국어로 출력.
+**[명도 대비 분석 알고리즘]**
+1. **격자 스캔:** 이미지를 3x3 격자로 나누었다고 상상하고, 왼쪽 상단부터 오른쪽 하단까지 순서대로 훑으십시오.
+2. **크기 무관:** 제목처럼 큰 글씨라고 해서 명도 대비가 확실할 것이라 단정 짓지 말고 무조건 검사하십시오.
+3. **전수 기록:** 문제가 발견되면 즉시 출력 리스트에 넣으십시오. (대표 사례 1개만 적는 것 금지)
 
 **[수행 프로세스 및 출력 형식]**
 
@@ -56,22 +56,27 @@ SYSTEM_PROMPT = """
 
 **2단계: 상세 분석 (전수 조사 결과)**
 - (형식: [위치/텍스트] 문제점 설명 -> 개선 권장)
-- 위반 사항이 여러 개면 번호를 매겨 모두 나열할 것.
+- 예시:
+  1. [상단 타이틀] 노란 배경/흰 글씨 (명도비 1.2:1) -> 검정 테두리 필요
+  2. [우측 하단 전화번호] 연회색 글씨 -> 진한 회색으로 변경 필요
 - QR코드가 있다면: "ℹ️ QR코드 경고: 본문에 URL 텍스트 병기 필수" 출력.
 - 특이사항 없으면 "특이사항 없음" 출력.
 
-**3단계: 텍스트 소스 (OCR)**
-- 상하단 로고/기관명 제외. 본문 핵심 내용만 추출.
-- 반드시 아래와 같이 코드 블록을 생성하여 출력:
+**3단계: 텍스트 소스 (Full OCR)**
+- 상하단 로고/기관명 제외. 본문 내용을 **끝까지** 추출.
+- 반드시 아래 코드 블록 안에 출력:
 ```text
-(여기에 추출한 텍스트 내용)
+(여기에 추출한 텍스트 내용. 중간에 끊지 말 것.)
 ```
 **(END OF OUTPUT)**
 """
 
-# 5. UI 구성
+# 6. UI 구성
 st.title("🏛️ 경평원 정보접근성 검사기 (Pro)")
-st.info("💡 AI가 이미지 전체를 꼼꼼하게 스캔하여 '모든' 위반 사항을 찾아냅니다.")
+st.info("💡 이미지의 모든 텍스트를 끝까지 읽고 정밀 분석합니다.")
+
+# 사이드바 혹은 메인에 옵션 추가
+use_pro_model = st.checkbox("🚀 고성능 모드 사용 (속도는 느리지만 더 꼼꼼함)")
 
 uploaded_file = st.file_uploader("이미지 업로드 (JPG, PNG)", type=["jpg", "png", "jpeg"])
 
@@ -79,12 +84,36 @@ if uploaded_file is not None:
     image = Image.open(uploaded_file)
     st.image(image, caption='검수 대상 이미지', use_container_width=True)
     
-    if st.button("🔍 정밀 진단 시작", type="primary"):
-        with st.spinner('AI가 픽셀 단위로 전수 조사 중입니다...'):
+    # 모델 선택 로직
+    if use_pro_model:
+        # Pro 모델 (무료 티어 사용 시 쿼터 제한 주의)
+        # 1.5 Pro가 쿼터에 걸린다면 2.0 Flash를 대안으로 사용 고려
+        target_model = 'gemini-1.5-pro' 
+        btn_label = "🔍 고성능 정밀 진단 시작 (Pro)"
+    else:
+        # Flash 모델 (기본)
+        target_model = 'models/gemini-2.5-flash'
+        btn_label = "🔍 접근성 진단 시작 (Flash)"
+
+    if st.button(btn_label, type="primary"):
+        with st.spinner(f'{target_model} 모델이 이미지를 픽셀 단위로 분석 중입니다...'):
             try:
+                # 모델 초기화 (버튼 누를 때 선택된 모델로 로드)
+                model = genai.GenerativeModel(
+                    model_name=target_model,
+                    generation_config=generation_config,
+                    safety_settings=safety_settings
+                )
+                
                 response = model.generate_content([SYSTEM_PROMPT, image])
+                
                 st.success("분석 완료")
                 st.markdown("### 📋 진단 결과")
                 st.markdown(response.text)
+                
             except Exception as e:
-                st.error(f"오류 발생: {e}")
+                # 에러 처리 강화
+                if "429" in str(e):
+                    st.error("🚨 사용량 초과(Quota Exceeded)입니다. 잠시 후 다시 시도하거나 '고성능 모드'를 끄고 시도해주세요.")
+                else:
+                    st.error(f"오류 발생: {e}")
