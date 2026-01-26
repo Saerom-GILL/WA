@@ -18,7 +18,7 @@ except FileNotFoundError:
 
 genai.configure(api_key=api_key)
 
-# 3. 안전 설정 (중요: 출력이 중간에 멈추는 것을 방지하기 위해 필터 해제)
+# 3. 안전 설정 (필수: 텍스트 추출 중단 방지를 위해 모든 필터 해제)
 safety_settings = [
     {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
     {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
@@ -26,57 +26,58 @@ safety_settings = [
     {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
 ]
 
-# 4. 모델 설정 (토큰 최대치 8192로 확장)
+# 4. 모델 설정 (Flash 모델 최적화)
 generation_config = {
     "temperature": 0.0,        # 창의성 0 (분석 모드)
     "top_p": 1.0,
-    "max_output_tokens": 8192, # <--- 여기가 핵심입니다. 텍스트가 잘리지 않게 최대치로 설정.
+    "max_output_tokens": 8192, # 출력 길이 최대화 (텍스트 잘림 방지)
 }
 
-# 5. 시스템 프롬프트 (OCR 누락 방지 + 구역별 스캔 강제)
+# 모델 초기화 (안정적인 1.5 Flash 사용)
+model = genai.GenerativeModel(
+    model_name='gemini-1.5-flash',
+    generation_config=generation_config,
+    safety_settings=safety_settings 
+)
+
+# 5. 시스템 프롬프트 (QR코드 상세 가이드 강화)
 SYSTEM_PROMPT = """
-[SYSTEM SETTING: RIGOROUS INSPECTION MODE]
+[SYSTEM SETTING: RIGOROUS ANALYTICAL MODE]
 당신은 'KWCAG 정보접근성 품질 관리관'입니다. 
-당신의 목표는 이미지 내의 텍스트를 **완전히 끝까지 읽어내고(Full OCR)**, 명도 대비 위반 사항을 **하나도 빠짐없이 전수 조사**하는 것입니다.
+목표: 이미지 내 텍스트를 **끝까지 완전하게 추출(Full OCR)**하고, 명도 대비 위반 및 QR코드 접근성을 **전수 조사**하는 것입니다.
 
-**[OCR 추출 절대 원칙]**
-1. 요약하지 마십시오. 이미지에 있는 모든 글자를 있는 그대로 가져오십시오.
-2. 중간에 멈추지 마십시오. 글자가 1000자가 넘어도 끝까지 출력하십시오.
-3. 표나 리스트가 있다면 그 구조를 유지하며 텍스트를 추출하십시오.
+**[작업 원칙]**
+1. **Full OCR:** 이미지의 텍스트가 아무리 길어도 중간에 자르지 말고 끝까지 출력하십시오.
+2. **전수 조사:** 명도 대비 위반 사항을 발견하면 즉시 멈추지 말고, 이미지 끝까지 스캔하여 모든 위반 사항을 나열하십시오.
+3. **QR코드 필수 체크:** QR코드는 시각장애인에게 치명적인 장벽임을 인지하고 상세히 안내하십시오.
 
-**[명도 대비 분석 알고리즘]**
-1. **격자 스캔:** 이미지를 3x3 격자로 나누었다고 상상하고, 왼쪽 상단부터 오른쪽 하단까지 순서대로 훑으십시오.
-2. **크기 무관:** 제목처럼 큰 글씨라고 해서 명도 대비가 확실할 것이라 단정 짓지 말고 무조건 검사하십시오.
-3. **전수 기록:** 문제가 발견되면 즉시 출력 리스트에 넣으십시오. (대표 사례 1개만 적는 것 금지)
+**[출력 포맷]**
 
-**[수행 프로세스 및 출력 형식]**
+**1단계: 명도 대비 판정**
+- ✅ 적격 / ⚠️ 주의 / ❌ 부적격
 
-**1단계: 명도 대비 및 가독성 평가**
-- 판정: ✅ 적격 / ⚠️ 주의 / ❌ 부적격 (하나라도 위반 시 부적격)
+**2단계: 상세 분석 (전수 조사 리스트)**
+- 위반된 부분의 [위치/내용]과 [문제점]을 구체적으로 나열하십시오.
+- 위반 사항이 없다면 "특이사항 없음"이라고 적으십시오.
 
-**2단계: 상세 분석 (전수 조사 결과)**
-- (형식: [위치/텍스트] 문제점 설명 -> 개선 권장)
-- 예시:
-  1. [상단 타이틀] 노란 배경/흰 글씨 (명도비 1.2:1) -> 검정 테두리 필요
-  2. [우측 하단 전화번호] 연회색 글씨 -> 진한 회색으로 변경 필요
-- QR코드가 있다면: "ℹ️ QR코드 경고: 본문에 URL 텍스트 병기 필수" 출력.
-- 특이사항 없으면 "특이사항 없음" 출력.
+**★ QR코드 발견 시 출력 양식 (매우 중요)**
+만약 이미지에 QR코드가 있다면, 반드시 아래 형식을 그대로 사용하여 출력하십시오:
+> **[QR코드]** (위치: 예-우측 상단)에 QR코드가 (개수)개 포함되어 있습니다.
+> 👉 "ℹ️ **추가 조언:** 시각장애인은 이미지 속 QR코드를 스캔할 수 없으므로, 게시물 본문에 해당 페이지로 연결되는 실제 URL 링크를 텍스트로 기재해야 합니다."
 
-**3단계: 텍스트 소스 (Full OCR)**
-- 상하단 로고/기관명 제외. 본문 내용을 **끝까지** 추출.
+**3단계: 텍스트 소스 (전체 추출)**
+- 상하단 로고 제외, 본문 핵심 내용 전체.
+- 표나 리스트가 있다면 구조를 유지할 것.
 - 반드시 아래 코드 블록 안에 출력:
 ```text
-(여기에 추출한 텍스트 내용. 중간에 끊지 말 것.)
+(추출한 텍스트 전체 내용을 여기에 출력)
 ```
 **(END OF OUTPUT)**
 """
 
 # 6. UI 구성
-st.title("🏛️ 경평원 정보접근성 검사기 (Pro)")
-st.info("💡 이미지의 모든 텍스트를 끝까지 읽고 정밀 분석합니다.")
-
-# 사이드바 혹은 메인에 옵션 추가
-use_pro_model = st.checkbox("🚀 고성능 모드 사용 (속도는 느리지만 더 꼼꼼함)")
+st.title("🏛️ 경평원 정보접근성 검사기")
+st.info("💡 텍스트 전수 조사 & QR코드 상세 가이드 모드 적용됨")
 
 uploaded_file = st.file_uploader("이미지 업로드 (JPG, PNG)", type=["jpg", "png", "jpeg"])
 
@@ -84,27 +85,9 @@ if uploaded_file is not None:
     image = Image.open(uploaded_file)
     st.image(image, caption='검수 대상 이미지', use_container_width=True)
     
-    # 모델 선택 로직
-    if use_pro_model:
-        # Pro 모델 (무료 티어 사용 시 쿼터 제한 주의)
-        # 1.5 Pro가 쿼터에 걸린다면 2.0 Flash를 대안으로 사용 고려
-        target_model = 'gemini-1.5-pro' 
-        btn_label = "🔍 고성능 정밀 진단 시작 (Pro)"
-    else:
-        # Flash 모델 (기본)
-        target_model = 'models/gemini-2.5-flash'
-        btn_label = "🔍 접근성 진단 시작 (Flash)"
-
-    if st.button(btn_label, type="primary"):
-        with st.spinner(f'{target_model} 모델이 이미지를 픽셀 단위로 분석 중입니다...'):
+    if st.button("🔍 진단 시작", type="primary"):
+        with st.spinner('AI가 이미지를 정밀 분석 중입니다...'):
             try:
-                # 모델 초기화 (버튼 누를 때 선택된 모델로 로드)
-                model = genai.GenerativeModel(
-                    model_name=target_model,
-                    generation_config=generation_config,
-                    safety_settings=safety_settings
-                )
-                
                 response = model.generate_content([SYSTEM_PROMPT, image])
                 
                 st.success("분석 완료")
@@ -112,8 +95,5 @@ if uploaded_file is not None:
                 st.markdown(response.text)
                 
             except Exception as e:
-                # 에러 처리 강화
-                if "429" in str(e):
-                    st.error("🚨 사용량 초과(Quota Exceeded)입니다. 잠시 후 다시 시도하거나 '고성능 모드'를 끄고 시도해주세요.")
-                else:
-                    st.error(f"오류 발생: {e}")
+                st.error(f"오류 발생: {e}")
+                st.caption("일시적인 오류일 수 있습니다. 다시 시도해주세요.")
