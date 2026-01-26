@@ -20,7 +20,7 @@ except FileNotFoundError:
 genai.configure(api_key=api_key)
 
 # 3. 모델 설정 (Gemini 1.5 Flash 사용)
-model = genai.GenerativeModel('gemini-1.5-pro')
+model = genai.GenerativeModel('gemini-1.5-pro-latest')
 
 # 4. 시스템 프롬프트 (오류 없이 작동하도록 코드 블록 문법 조정됨)
 SYSTEM_PROMPT = """
