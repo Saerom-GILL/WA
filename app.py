@@ -28,7 +28,7 @@ generation_config = {
 
 # 모델 선택 (1.5 Flash가 가성비/속도 최적. 필요시 'gemini-1.5-pro-001'로 변경)
 model = genai.GenerativeModel(
-    model_name='gemini-1.5-flash', 
+    model_name='models/gemini-2.5-flash', 
     generation_config=generation_config
 )
 
