@@ -35,7 +35,7 @@ generation_config = {
 
 # 모델 초기화 (안정적인 1.5 Flash 사용)
 model = genai.GenerativeModel(
-    model_name='gemini-1.5-flash',
+    model_name='models/gemini-2.5-flash',
     generation_config=generation_config,
     safety_settings=safety_settings 
 )
