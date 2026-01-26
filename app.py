@@ -20,8 +20,9 @@ except FileNotFoundError:
 genai.configure(api_key=api_key)
 
 # 3. 모델 설정 (Gemini 1.5 Flash 사용)
-model = genai.GenerativeModel('gemini-pro')
-
+# 3. 모델 설정 (Gemini 1.5 Pro - 구체적 빌드 번호 명시)
+# -001 또는 -002를 붙이면 별칭 에러를 우회할 수 있습니다.
+model = genai.GenerativeModel('gemini-1.5-pro-001')
 # 4. 시스템 프롬프트 (오류 없이 작동하도록 코드 블록 문법 조정됨)
 SYSTEM_PROMPT = """
 **[SYSTEM SETTING: STRICT OUTPUT ONLY MODE]**
