@@ -26,21 +26,21 @@ safety_settings = [
     {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
 ]
 
-# 4. 모델 설정 (Flash 모델 최적화)
+# 4. 모델 설정 (최신 3.1 Pro Preview 적용 및 출력 길이 최대화)
 generation_config = {
     "temperature": 0.0,        # 창의성 0 (분석 모드)
     "top_p": 1.0,
     "max_output_tokens": 8192, # 출력 길이 최대화 (텍스트 잘림 방지)
 }
 
-# 모델 초기화 (안정적인 1.5 Flash 사용)
+# 🚀 요청하신 최신 모델로 변경 완료
 model = genai.GenerativeModel(
-    model_name='models/gemini-2.5-flash',
+    model_name='gemini-3.1-pro-preview',
     generation_config=generation_config,
     safety_settings=safety_settings 
 )
 
-# 5. 시스템 프롬프트 (QR코드 상세 가이드 강화)
+# 5. 시스템 프롬프트 (QR코드 상세 가이드 및 전수 조사 강제)
 SYSTEM_PROMPT = """
 [SYSTEM SETTING: RIGOROUS ANALYTICAL MODE]
 당신은 'KWCAG 정보접근성 품질 관리관'입니다. 
@@ -77,7 +77,7 @@ SYSTEM_PROMPT = """
 
 # 6. UI 구성
 st.title("🏛️ 경평원 정보접근성 검사기")
-st.info("💡 텍스트 전수 조사 & QR코드 상세 가이드 모드 적용됨")
+st.info("💡 최신 Gemini 3.1 Pro 기반 정밀 분석 모드가 적용되었습니다.")
 
 uploaded_file = st.file_uploader("이미지 업로드 (JPG, PNG)", type=["jpg", "png", "jpeg"])
 
@@ -86,7 +86,7 @@ if uploaded_file is not None:
     st.image(image, caption='검수 대상 이미지', use_container_width=True)
     
     if st.button("🔍 진단 시작", type="primary"):
-        with st.spinner('AI가 이미지를 정밀 분석 중입니다...'):
+        with st.spinner('최신 AI가 이미지를 정밀 분석 중입니다...'):
             try:
                 response = model.generate_content([SYSTEM_PROMPT, image])
                 
