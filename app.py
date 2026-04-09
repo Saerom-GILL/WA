@@ -91,9 +91,8 @@ SYSTEM_PROMPT_POST = """
 
 **[출력 포맷]**
 
-**0단계: 이미지 성격 분류**
-- 분류: [텍스트를 포함하는 이미지] 또는 [텍스트를 포함하지 않는 이미지]
-- 이유: (해당 분류로 판단한 간략한 근거)
+**0단계: [텍스트를 포함하는 이미지]** (또는 **0단계: [텍스트를 포함하지 않는 이미지]**)
+(해당 분류로 판단한 간략한 근거를 자연스러운 서술형 문장으로 작성)
 
 ---
 
@@ -190,7 +189,7 @@ def create_summary_image(text, original_image):
     # 워터마크 패턴 (카드 위, 텍스트 아래에 촘촘하게 깔리도록 수정)
     watermark_text = " 경기도평생교육진흥원 정보접근성 검사기 - 팝업/대형배너 검사 결과 "
     watermark_color = (242, 242, 245) # 텍스트를 방해하지 않는 매우 연한 색상
-    
+
     # 간격을 훨씬 촘촘하게 (y축 30, x축 350 간격)
     for y in range(card_margin, img_height - card_margin, 30):
         for x in range(card_margin - 200, img_width - card_margin, 350):
