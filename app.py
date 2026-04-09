@@ -3,6 +3,7 @@ import google.generativeai as genai
 from PIL import Image, ImageDraw, ImageFont
 import io
 import textwrap
+from st_copy_to_clipboard import st_copy_to_clipboard
 
 # 1. 페이지 설정
 st.set_page_config(
@@ -193,16 +194,15 @@ def render_inspection_ui(category):
                     response = model.generate_content([SYSTEM_PROMPT, image])
                     
                     st.success("점검 완료")
-                    st.markdown("### 📋 점검 결과")
-                    st.markdown(response.text)
-                    
-                    st.markdown("---")
                     
                     # 1~2단계 결과 추출 (3단계 앞부분까지만)
                     result_text = response.text
                     summary_text = result_text.split("**3단계:")[0] if "**3단계:" in result_text else result_text
                     
                     if category == '팝업 / 대형 배너':
+                        st.markdown("### 📋 점검 결과")
+                        st.markdown(response.text)
+                        st.markdown("---")
                         st.markdown("#### 📸 결과 캡처 이미지")
                         st.info("아래 버튼을 눌러 위변조 방지 패턴과 원본 이미지가 포함된 결과 문서를 다운로드하세요.")
                         img_bytes = create_summary_image(summary_text, image)
@@ -215,16 +215,27 @@ def render_inspection_ui(category):
                         )
                         
                     elif category == '썸네일':
-                        st.markdown("#### 📝 결과 텍스트 복사 및 저장")
-                        st.info("텍스트 우측 상단의 복사(📋) 버튼을 클릭하여 복사하거나, 아래 버튼으로 저장하세요.")
-                        st.code(summary_text, language='markdown')
-                        st.download_button(
-                            label="텍스트 파일로 저장",
-                            data=summary_text,
-                            file_name="inspection_result.txt",
-                            mime="text/plain",
-                            type="primary"
-                        )
+                        # 마크다운 기호 제거하여 화면에 보이는 텍스트(Plain Text) 형태로 변환
+                        plain_text = summary_text.replace("**", "").replace("### ", "").replace("## ", "").replace("> ", "")
+                        
+                        # 결과 헤더와 복사 버튼을 한 줄에 배치하여 직관성 향상
+                        col1, col2 = st.columns([0.8, 0.2])
+                        with col1:
+                            st.markdown("### 📋 점검 결과")
+                        with col2:
+                            st_copy_to_clipboard(
+                                text=plain_text,
+                                before_copy_label="📋 결과 복사",
+                                after_copy_label="✅ 복사 완료!"
+                            )
+                        
+                        # 중복 출력을 방지하고, 화면에 1~2단계 요약 결과만 한 번 표시
+                        st.markdown(summary_text)
+                        st.caption("ℹ️ 위 복사 버튼을 누르면 마크다운(별표 등)이 제거된 깔끔한 텍스트로 복사되어 바로 붙여넣기할 수 있습니다.")
+                    
+                    elif category == '게시글 내 삽입 이미지':
+                        st.markdown("### 📋 점검 결과")
+                        st.markdown(response.text)
                     
                 except Exception as e:
                     st.error(f"오류 발생: {e}")
