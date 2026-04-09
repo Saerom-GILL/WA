@@ -1,6 +1,8 @@
 import streamlit as st
 import google.generativeai as genai
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
+import io
+import textwrap
 
 # 1. 페이지 설정
 st.set_page_config(
@@ -79,21 +81,175 @@ SYSTEM_PROMPT = """
 st.title("🏛️ 경평원 정보접근성 검사기")
 st.info("💡 최신 Gemini 3.1 Pro 기반 정밀 분석 모드가 적용되었습니다.")
 
-uploaded_file = st.file_uploader("이미지 업로드 (JPG, PNG)", type=["jpg", "png", "jpeg"])
+# 세션 상태 초기화
+if 'selected_category' not in st.session_state:
+    st.session_state.selected_category = None
 
-if uploaded_file is not None:
-    image = Image.open(uploaded_file)
-    st.image(image, caption='검수 대상 이미지', use_container_width=True)
+def create_summary_image(text, original_image):
+    font_path = "NotoSansKR.otf"
+    try:
+        font_title = ImageFont.truetype(font_path, 24)
+        font_body = ImageFont.truetype(font_path, 16)
+        font_watermark = ImageFont.truetype(font_path, 12) # 폰트 크기 대폭 축소
+    except IOError:
+        font_title = ImageFont.load_default()
+        font_body = ImageFont.load_default()
+        font_watermark = ImageFont.load_default()
+
+    # 이모지 치환 (Pillow 렌더링 시 엑박/깨짐 방지)
+    text = text.replace("✅", "[O]").replace("⚠️", "[!]").replace("❌", "[X]")
+    text = text.replace("👉", "->").replace("ℹ️", "[안내]")
+
+    # 1. 썸네일 생성 (크기 약간 확대)
+    thumb_width = 350
+    w_percent = (thumb_width / float(original_image.size[0]))
+    h_size = int((float(original_image.size[1]) * float(w_percent)))
+    thumb_img = original_image.resize((thumb_width, h_size), Image.Resampling.LANCZOS)
+
+    # 2. 텍스트 줄바꿈 처리 (가로 길이를 넉넉하게 잡고, wrap 기준 수정)
+    # 한글은 폭을 더 차지하므로 width를 보수적으로 설정
+    wrap_width = 45 
+    wrapped_lines = []
+    for line in text.split('\n'):
+        if line.strip() == "":
+            wrapped_lines.append(("", False))
+        elif line.startswith("**") and line.endswith("**"):
+            wrapped_lines.append((line.replace("**", ""), True)) # 제목
+        else:
+            for wrapped in textwrap.wrap(line, width=wrap_width):
+                wrapped_lines.append((wrapped, False))
+            
+    line_height = 28 # 줄간격 여유
+    text_height = len(wrapped_lines) * line_height + 150
     
-    if st.button("🔍 진단 시작", type="primary"):
-        with st.spinner('최신 AI가 이미지를 정밀 분석 중입니다...'):
-            try:
-                response = model.generate_content([SYSTEM_PROMPT, image])
-                
-                st.success("분석 완료")
-                st.markdown("### 📋 진단 결과")
-                st.markdown(response.text)
-                
-            except Exception as e:
-                st.error(f"오류 발생: {e}")
-                st.caption("일시적인 오류일 수 있습니다. 다시 시도해주세요.")
+    # 3. 전체 이미지 크기 계산 (폭을 1200으로 넓혀 텍스트 잘림 방지)
+    img_width = 1200
+    img_height = max(text_height, h_size + 150)
+
+    # 기본 배경 생성 (살짝 회색빛)
+    img = Image.new('RGB', (img_width, img_height), color='#f4f6f8')
+    d = ImageDraw.Draw(img)
+
+    # 하얀색 카드 형태 (HTML/CSS 효과)
+    card_margin = 30
+    d.rounded_rectangle(
+        [(card_margin, card_margin), (img_width - card_margin, img_height - card_margin)], 
+        radius=15, 
+        fill="white", 
+        outline="#e0e0e0", 
+        width=2
+    )
+
+    # 워터마크 패턴 (카드 위, 텍스트 아래에 촘촘하게 깔리도록 수정)
+    watermark_text = " 경기도평생교육진흥원 정보접근성 검사기 - 팝업/대형배너 검사 결과 "
+    watermark_color = (242, 242, 245) # 텍스트를 방해하지 않는 매우 연한 색상
+    
+    # 간격을 훨씬 촘촘하게 (y축 30, x축 350 간격)
+    for y in range(card_margin, img_height - card_margin, 30):
+        for x in range(card_margin - 200, img_width - card_margin, 350):
+            # 지그재그 패턴으로 엇갈리게 배치
+            offset = 175 if (y // 30) % 2 == 0 else 0
+            d.text((x + offset, y), watermark_text, font=font_watermark, fill=watermark_color)
+
+    # 제목
+    d.text((card_margin + 40, card_margin + 40), "팝업 / 대형 배너 검사 결과", font=font_title, fill='#1e1e1e')
+    d.line([(card_margin + 40, card_margin + 80), (img_width - card_margin - 40, card_margin + 80)], fill="#eeeeee", width=2)
+
+    # 이미지 삽입
+    img.paste(thumb_img, (card_margin + 40, card_margin + 110))
+
+    # 텍스트 렌더링 영역 (이미지 우측)
+    text_x = card_margin + 40 + thumb_width + 50
+    y = card_margin + 110
+    for line_text, is_bold in wrapped_lines:
+        current_font = font_title if is_bold else font_body
+        color = '#1e1e1e' if is_bold else '#333333'
+        d.text((text_x, y), line_text, font=current_font, fill=color)
+        y += (35 if is_bold else line_height)
+        
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+def render_inspection_ui(category):
+    # 뒤로 가기 버튼
+    if st.button("⬅️ 다른 카테고리 선택하기"):
+        st.session_state.selected_category = None
+        st.rerun()
+
+    st.subheader(f"[{category}] 검사")
+    
+    # 카테고리별로 고유한 key를 부여하여 위젯 충돌 방지
+    uploaded_file = st.file_uploader(f"이미지 업로드 ({category})", type=["jpg", "png", "jpeg"], key=f"uploader_{category}")
+
+    if uploaded_file is not None:
+        image = Image.open(uploaded_file)
+        st.image(image, caption='검수 대상 이미지', use_container_width=True)
+        
+        if st.button("🔍 점검 시작", type="primary", key=f"btn_{category}"):
+            with st.spinner('최신 AI가 이미지를 정밀 분석 중입니다...'):
+                try:
+                    # 추후 카테고리별로 프롬프트가 달라질 경우 여기서 분기 처리 가능
+                    response = model.generate_content([SYSTEM_PROMPT, image])
+                    
+                    st.success("점검 완료")
+                    st.markdown("### 📋 점검 결과")
+                    st.markdown(response.text)
+                    
+                    st.markdown("---")
+                    
+                    # 1~2단계 결과 추출 (3단계 앞부분까지만)
+                    result_text = response.text
+                    summary_text = result_text.split("**3단계:")[0] if "**3단계:" in result_text else result_text
+                    
+                    if category == '팝업 / 대형 배너':
+                        st.markdown("#### 📸 결과 캡처 이미지")
+                        st.info("아래 버튼을 눌러 위변조 방지 패턴과 원본 이미지가 포함된 결과 문서를 다운로드하세요.")
+                        img_bytes = create_summary_image(summary_text, image)
+                        st.download_button(
+                            label="저장하기",
+                            data=img_bytes,
+                            file_name="inspection_result.png",
+                            mime="image/png",
+                            type="primary"
+                        )
+                        
+                    elif category == '썸네일':
+                        st.markdown("#### 📝 결과 텍스트 복사 및 저장")
+                        st.info("텍스트 우측 상단의 복사(📋) 버튼을 클릭하여 복사하거나, 아래 버튼으로 저장하세요.")
+                        st.code(summary_text, language='markdown')
+                        st.download_button(
+                            label="텍스트 파일로 저장",
+                            data=summary_text,
+                            file_name="inspection_result.txt",
+                            mime="text/plain",
+                            type="primary"
+                        )
+                    
+                except Exception as e:
+                    st.error(f"오류 발생: {e}")
+                    st.caption("일시적인 오류일 수 있습니다. 다시 시도해주세요.")
+
+# 메인 화면 라우팅
+if st.session_state.selected_category is None:
+    st.markdown("### 📌 검사할 콘텐츠 유형을 선택하세요")
+    st.write("진행하고자 하는 정보접근성 검사 항목을 아래에서 선택해 주세요.")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("🖼️ 팝업 / 대형 배너\n\n가장 돋보이는 메인 이미지", use_container_width=True):
+            st.session_state.selected_category = '팝업 / 대형 배너'
+            st.rerun()
+            
+    with col2:
+        if st.button("📱 썸네일\n\n목록형 작은 미리보기 이미지", use_container_width=True):
+            st.session_state.selected_category = '썸네일'
+            st.rerun()
+            
+    with col3:
+        if st.button("📝 게시글 내 삽입 이미지\n\n본문에 포함된 상세 정보 이미지", use_container_width=True):
+            st.session_state.selected_category = '게시글 내 삽입 이미지'
+            st.rerun()
+else:
+    render_inspection_ui(st.session_state.selected_category)
