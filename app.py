@@ -236,62 +236,78 @@ def render_inspection_ui(category):
     if uploaded_file is not None:
         image = Image.open(uploaded_file)
         st.image(image, caption='검수 대상 이미지', use_container_width=True)
-        
+
+        # 현재 업로드된 파일명으로 고유 식별자 생성
+        file_id = f"{category}_{uploaded_file.name}"
+
+        # 파일이 변경되면 이전 결과 초기화
+        if 'current_file_id' not in st.session_state or st.session_state.current_file_id != file_id:
+            st.session_state.current_file_id = file_id
+            st.session_state.result_text = None
+            st.session_state.summary_text = None
+            st.session_state.img_bytes = None
+
         if st.button("🔍 점검 시작", type="primary", key=f"btn_{category}"):
             with st.spinner('최신 AI가 이미지를 정밀 분석 중입니다...'):
                 try:
                     # 카테고리별 프롬프트 분기 처리
                     prompt_to_use = SYSTEM_PROMPT_POST if category == '게시글 내 삽입 이미지' else SYSTEM_PROMPT
                     response = model.generate_content([prompt_to_use, image])
-                    
+
                     st.success("점검 완료")
-                    
-                    # 1~2단계 결과 추출 (3단계 앞부분까지만)
+
+                    # 세션 상태에 결과 저장
+                    st.session_state.result_text = response.text
+
                     result_text = response.text
                     summary_text = result_text.split("**3단계:")[0] if "**3단계:" in result_text else result_text
-                    
+                    st.session_state.summary_text = summary_text
+
                     if category == '팝업 / 대형 배너':
-                        st.markdown("### 📋 점검 결과")
-                        st.markdown(response.text)
-                        st.markdown("---")
-                        st.markdown("#### 📸 결과 캡처 이미지")
-                        st.info("아래 버튼을 눌러 위변조 방지 패턴과 원본 이미지가 포함된 결과 문서를 다운로드하세요.")
-                        img_bytes = create_summary_image(summary_text, image)
-                        st.download_button(
-                            label="저장하기",
-                            data=img_bytes,
-                            file_name="inspection_result.png",
-                            mime="image/png",
-                            type="primary"
-                        )
-                        
-                    elif category == '썸네일':
-                        # 마크다운 기호 제거하여 화면에 보이는 텍스트(Plain Text) 형태로 변환
-                        plain_text = summary_text.replace("**", "").replace("### ", "").replace("## ", "").replace("> ", "")
-                        
-                        # 결과 헤더와 복사 버튼을 한 줄에 배치하여 직관성 향상
-                        col1, col2 = st.columns([0.8, 0.2])
-                        with col1:
-                            st.markdown("### 📋 점검 결과")
-                        with col2:
-                            st_copy_to_clipboard(
-                                text=plain_text,
-                                before_copy_label="📋 결과 복사",
-                                after_copy_label="✅ 복사 완료!"
-                            )
-                        
-                        # 중복 출력을 방지하고, 화면에 1~2단계 요약 결과만 한 번 표시
-                        st.markdown(summary_text)
-                        st.caption("ℹ️ 위 복사 버튼을 누르면 마크다운(별표 등)이 제거된 깔끔한 텍스트로 복사되어 바로 붙여넣기할 수 있습니다.")
-                    
-                    elif category == '게시글 내 삽입 이미지':
-                        st.markdown("### 📋 점검 결과")
-                        st.markdown(response.text)
-                    
+                        st.session_state.img_bytes = create_summary_image(summary_text, image)
+
                 except Exception as e:
                     st.error(f"오류 발생: {e}")
                     st.caption("일시적인 오류일 수 있습니다. 다시 시도해주세요.")
 
+        # 세션에 결과가 있으면 화면에 렌더링
+        if st.session_state.result_text is not None:
+            if category == '팝업 / 대형 배너':
+                st.markdown("### 📋 점검 결과")
+                st.markdown(st.session_state.result_text)
+                st.markdown("---")
+                st.markdown("#### 📸 결과 캡처 이미지")
+                st.info("아래 버튼을 눌러 위변조 방지 패턴과 원본 이미지가 포함된 결과 문서를 다운로드하세요.")
+                st.download_button(
+                    label="저장하기",
+                    data=st.session_state.img_bytes,
+                    file_name="inspection_result.png",
+                    mime="image/png",
+                    type="primary"
+                )
+
+            elif category == '썸네일':
+                # 마크다운 기호 제거하여 화면에 보이는 텍스트(Plain Text) 형태로 변환
+                plain_text = st.session_state.summary_text.replace("**", "").replace("### ", "").replace("## ", "").replace("> ", "")
+
+                # 결과 헤더와 복사 버튼을 한 줄에 배치하여 직관성 향상
+                col1, col2 = st.columns([0.8, 0.2])
+                with col1:
+                    st.markdown("### 📋 점검 결과")
+                with col2:
+                    st_copy_to_clipboard(
+                        text=plain_text,
+                        before_copy_label="📋 결과 복사",
+                        after_copy_label="✅ 복사 완료!"
+                    )
+
+                # 중복 출력을 방지하고, 화면에 1~2단계 요약 결과만 한 번 표시
+                st.markdown(st.session_state.summary_text)
+                st.caption("ℹ️ 위 복사 버튼을 누르면 마크다운(별표 등)이 제거된 깔끔한 텍스트로 복사되어 바로 붙여넣기할 수 있습니다.")
+
+            elif category == '게시글 내 삽입 이미지':
+                st.markdown("### 📋 점검 결과")
+                st.markdown(st.session_state.result_text)
 # 메인 화면 라우팅
 if st.session_state.selected_category is None:
     st.markdown("### 📌 검사할 콘텐츠 유형을 선택하세요")
