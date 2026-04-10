@@ -107,7 +107,7 @@ SYSTEM_PROMPT_POST = """
 - 위반된 부분의 [위치/내용]과 [문제점]을 구체적으로 나열하십시오.
 - 위반 사항이 없다면 "특이사항 없음"이라고 적으십시오.
 
-**3단계: 텍스트 소스 (전체 추출)**
+**3단계: 텍스트 소스 (전체 추출)** `※ 복사 후 '이미지 설명' 입력란에 입력하세요.`
 - 상하단 로고 제외, 본문 핵심 내용 전체를 추출. 표나 리스트가 있다면 구조를 유지할 것.
 - 반드시 아래 코드 블록 안에 출력:
 ```text
@@ -117,7 +117,7 @@ SYSTEM_PROMPT_POST = """
 ---
 
 **(만약 [텍스트를 포함하지 않는 이미지]로 분류된 경우, 아래 포맷으로 출력)**
-**1단계: 대체 텍스트 요약**
+**1단계: 대체 텍스트 요약** `※ 복사 후 '이미지 설명' 입력란에 입력하세요.`
 - 시각장애인이 이미지를 보지 않고도 맥락을 이해할 수 있도록, 사진의 핵심 내용이나 현장의 분위기, 주요 피사체의 행동 등을 요약하여 제공하십시오.
 - 반드시 아래 코드 블록 안에 출력:
 ```text
@@ -285,23 +285,6 @@ def render_inspection_ui(category):
                     elif category == '게시글 내 삽입 이미지':
                         st.markdown("### 📋 점검 결과")
                         st.markdown(response.text)
-                        
-                        # AI가 생성한 마크다운 코드 블록(```text ... ```) 안의 내용만 정규식으로 추출
-                        match = re.search(r"```text\n(.*?)```", response.text, re.DOTALL)
-                        if match:
-                            extracted_text = match.group(1).strip()
-                            
-                            st.markdown("---")
-                            col1, col2 = st.columns([0.8, 0.2])
-                            with col1:
-                                st.markdown("#### 📝 추출된 텍스트 / 대체 텍스트")
-                            with col2:
-                                st_copy_to_clipboard(
-                                    text=extracted_text,
-                                    before_copy_label="📋 텍스트 복사",
-                                    after_copy_label="✅ 복사 완료!"
-                                )
-                            st.caption("ℹ️ 위 복사 버튼을 누르면 AI가 생성한 '텍스트 소스' 또는 '대체 텍스트 요약'만 깔끔하게 복사됩니다.")
                     
                 except Exception as e:
                     st.error(f"오류 발생: {e}")
