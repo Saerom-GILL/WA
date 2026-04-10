@@ -298,18 +298,19 @@ if st.session_state.selected_category is None:
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("🖼️ 팝업 / 대형 배너\n\n가장 돋보이는 메인 이미지", use_container_width=True):
+        if st.button("🖼️ 팝업 / 대형 배너", use_container_width=True):
             st.session_state.selected_category = '팝업 / 대형 배너'
             st.rerun()
-            
+
     with col2:
-        if st.button("📱 썸네일\n\n목록형 작은 미리보기 이미지", use_container_width=True):
+        if st.button("📱 썸네일", use_container_width=True):
             st.session_state.selected_category = '썸네일'
             st.rerun()
-            
+
     with col3:
-        if st.button("📝 게시글 내 삽입 이미지\n\n본문에 포함된 상세 정보 이미지", use_container_width=True):
+        if st.button("📝 게시글 내 삽입 이미지", use_container_width=True):
             st.session_state.selected_category = '게시글 내 삽입 이미지'
             st.rerun()
+
 else:
     render_inspection_ui(st.session_state.selected_category)
