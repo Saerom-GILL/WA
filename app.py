@@ -5,6 +5,11 @@ import io
 import textwrap
 import re
 from st_copy_to_clipboard import st_copy_to_clipboard
+import streamlit.components.v1 as components
+import base64
+
+# 사용자 정의 업로더 컴포넌트 선언
+custom_uploader = components.declare_component("custom_uploader", path="custom_uploader")
 
 # 1. 페이지 설정
 st.set_page_config(
@@ -230,15 +235,26 @@ def render_inspection_ui(category):
 
     st.subheader(f"[{category}] 검사")
     
-    # 카테고리별로 고유한 key를 부여하여 위젯 충돌 방지
-    uploaded_file = st.file_uploader(f"이미지 업로드 ({category})", type=["jpg", "png", "jpeg"], key=f"uploader_{category}")
+    image = None
+    file_id = None
 
-    if uploaded_file is not None:
-        image = Image.open(uploaded_file)
+    # 단일 통합 업로더 UI 렌더링
+    file_data = custom_uploader(key=f"custom_uploader_{category}")
+
+    if file_data is not None:
+        try:
+            # Base64 데이터에서 실제 이미지 추출
+            base64_data = file_data["data"].split(",")[1]
+            image_bytes = base64.b64decode(base64_data)
+            image = Image.open(io.BytesIO(image_bytes))
+            
+            # 고유 파일 ID 생성
+            file_id = f"{category}_uploaded_{file_data['name']}_{file_data['size']}"
+        except Exception as e:
+            st.error(f"이미지를 불러오는 중 오류가 발생했습니다: {e}")
+
+    if image is not None:
         st.image(image, caption='검수 대상 이미지', use_container_width=True)
-
-        # 현재 업로드된 파일명으로 고유 식별자 생성
-        file_id = f"{category}_{uploaded_file.name}"
 
         # 파일이 변경되면 이전 결과 초기화
         if 'current_file_id' not in st.session_state or st.session_state.current_file_id != file_id:

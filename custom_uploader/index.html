@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    :root {
+      --primary-color: #ff4b4b;
+      --background-color: #ffffff;
+      --secondary-background-color: #f0f2f6;
+      --text-color: #31333f;
+      --font: "Source Sans Pro", sans-serif;
+    }
+    
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: var(--font);
+      background-color: var(--background-color);
+      color: var(--text-color);
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px;
+    }
+
+    .uploader-box {
+      width: 100%;
+      border: 2px dashed #88888888;
+      border-radius: 0.5rem;
+      padding: 2.5rem 1rem;
+      text-align: center;
+      background-color: var(--secondary-background-color);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 180px;
+    }
+
+    .uploader-box.dragover, .uploader-box:hover {
+      border-color: var(--primary-color);
+    }
+
+    .icon {
+      margin-bottom: 1rem;
+      color: var(--text-color);
+      opacity: 0.7;
+    }
+
+    .icon svg {
+      width: 48px;
+      height: 48px;
+      fill: currentColor;
+    }
+
+    .text {
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-color);
+    }
+
+    .text span {
+      font-weight: 600;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      width: 50%;
+      margin: 1.5rem 0;
+      color: var(--text-color);
+      opacity: 0.5;
+      font-size: 0.9rem;
+    }
+
+    .divider::before, .divider::after {
+      content: "";
+      flex: 1;
+      border-bottom: 1px solid #88888888;
+    }
+
+    .divider::before { margin-right: 15px; }
+    .divider::after { margin-left: 15px; }
+    
+    .subtext-box {
+      font-size: 0.95rem;
+      color: var(--text-color);
+      opacity: 0.8;
+      display: inline-flex;
+      align-items: center;
+      background-color: var(--background-color);
+      padding: 0.5rem 1rem;
+      border-radius: 1.5rem;
+      border: 1px solid #88888844;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="uploader" class="uploader-box">
+    <div class="icon">
+      <svg focusable="false" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.36 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"></path></svg>
+    </div>
+    <div class="text">여기로 이미지를 드래그하거나 <span>파일을 업로드</span> 하세요.</div>
+    <div class="divider">또는</div>
+    <div class="subtext-box">
+      📋 클립보드 이미지 붙여넣기 (Ctrl+V / ⌘+V)
+    </div>
+    <input type="file" id="fileInput" accept="image/*" />
+  </div>
+
+  <script>
+    function sendValueToStreamlit(value) {
+      window.parent.postMessage({
+        isStreamlitMessage: true,
+        type: "streamlit:setComponentValue",
+        value: value,
+      }, "*");
+    }
+
+    function setFrameHeight() {
+      window.parent.postMessage({
+        isStreamlitMessage: true,
+        type: "streamlit:setFrameHeight",
+        height: document.body.scrollHeight,
+      }, "*");
+    }
+
+    // Tell Streamlit we're ready
+    window.parent.postMessage({
+      isStreamlitMessage: true,
+      type: "streamlit:componentReady",
+      apiVersion: 1,
+    }, "*");
+
+    // Listen for messages from Streamlit
+    window.addEventListener("message", function(event) {
+      if (event.data.type === "streamlit:render") {
+        // Streamlit 테마 정보를 추출하여 CSS 변수로 설정 (다크/라이트 모드 자동 대응)
+        if (event.data.theme) {
+          const theme = event.data.theme;
+          document.documentElement.style.setProperty('--primary-color', theme.primaryColor);
+          document.documentElement.style.setProperty('--background-color', theme.backgroundColor);
+          document.documentElement.style.setProperty('--secondary-background-color', theme.secondaryBackgroundColor);
+          document.documentElement.style.setProperty('--text-color', theme.textColor);
+          document.documentElement.style.setProperty('--font', theme.font);
+        }
+        setFrameHeight();
+      }
+    });
+
+    function sendImage(file) {
+      if (!file || !file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        sendValueToStreamlit({
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          data: e.target.result
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    const uploader = document.getElementById('uploader');
+    const fileInput = document.getElementById('fileInput');
+
+    uploader.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length) sendImage(e.target.files[0]);
+      // Reset input value to allow uploading the same file again if needed
+      fileInput.value = '';
+    });
+
+    uploader.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploader.classList.add('dragover');
+    });
+    uploader.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      uploader.classList.remove('dragover');
+    });
+    uploader.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploader.classList.remove('dragover');
+      if (e.dataTransfer.files.length) sendImage(e.dataTransfer.files[0]);
+    });
+
+    // Listen for paste anywhere in the document
+    document.addEventListener('paste', (e) => {
+      const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+      for (let item of items) {
+        if (item.type.indexOf("image") !== -1) {
+          const file = item.getAsFile();
+          if (file) {
+            // Some browsers don't give a proper name to pasted files, so we rename it
+            const newFile = new File([file], "pasted_image_" + Date.now() + ".png", {type: file.type});
+            sendImage(newFile);
+          }
+          break;
+        }
+      }
+    });
+    
+    // Initial height setting
+    setTimeout(setFrameHeight, 100);
+  </script>
+</body>
+</html>
