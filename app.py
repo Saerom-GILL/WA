@@ -238,8 +238,13 @@ def render_inspection_ui(category):
     image = None
     file_id = None
 
+    # 업로더 컴포넌트 초기화를 위한 동적 키 관리
+    uploader_key_name = f"uploader_key_{category}"
+    if uploader_key_name not in st.session_state:
+        st.session_state[uploader_key_name] = 0
+
     # 단일 통합 업로더 UI 렌더링
-    file_data = custom_uploader(key=f"custom_uploader_{category}")
+    file_data = custom_uploader(key=f"custom_uploader_{category}_{st.session_state[uploader_key_name]}")
 
     if file_data is not None:
         try:
@@ -254,7 +259,17 @@ def render_inspection_ui(category):
             st.error(f"이미지를 불러오는 중 오류가 발생했습니다: {e}")
 
     if image is not None:
-        st.image(image, caption='검수 대상 이미지', use_container_width=True)
+        # 취소 버튼을 이미지 위쪽에 배치
+        col_img1, col_img2 = st.columns([0.8, 0.2])
+        with col_img1:
+            st.markdown(f"**첨부된 파일:** `{file_data['name']}`")
+        with col_img2:
+            if st.button("❌ 선택 취소", use_container_width=True, key=f"btn_cancel_{category}"):
+                st.session_state[uploader_key_name] += 1
+                st.session_state.result_text = None
+                st.rerun()
+
+        st.image(image, use_container_width=True)
 
         # 파일이 변경되면 이전 결과 초기화
         if 'current_file_id' not in st.session_state or st.session_state.current_file_id != file_id:

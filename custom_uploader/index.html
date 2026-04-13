@@ -31,17 +31,31 @@
       padding: 2.5rem 1rem;
       text-align: center;
       background-color: var(--secondary-background-color);
-      cursor: pointer;
       transition: all 0.2s ease;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       min-height: 180px;
+      outline: none;
     }
 
-    .uploader-box.dragover, .uploader-box:hover {
+    .uploader-box.dragover, .uploader-box:focus {
       border-color: var(--primary-color);
+    }
+
+    .clickable-area {
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    .clickable-area:hover .icon {
+      opacity: 1;
+      color: var(--primary-color);
     }
 
     .icon {
@@ -104,11 +118,13 @@
   </style>
 </head>
 <body>
-  <div id="uploader" class="uploader-box">
-    <div class="icon">
-      <svg focusable="false" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.36 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"></path></svg>
+  <div id="uploader" class="uploader-box" tabindex="0">
+    <div id="clickable-area" class="clickable-area">
+      <div class="icon">
+        <svg focusable="false" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.36 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"></path></svg>
+      </div>
+      <div class="text">여기로 이미지를 드래그하거나 <span>파일을 업로드</span> 하세요.</div>
     </div>
-    <div class="text">여기로 이미지를 드래그하거나 <span>파일을 업로드</span> 하세요.</div>
     <div class="divider">또는</div>
     <div class="subtext-box">
       📋 클립보드 이미지 붙여넣기 (Ctrl+V / ⌘+V)
@@ -172,8 +188,16 @@
 
     const uploader = document.getElementById('uploader');
     const fileInput = document.getElementById('fileInput');
+    const clickableArea = document.getElementById('clickable-area');
 
-    uploader.addEventListener('click', () => fileInput.click());
+    clickableArea.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent focusing the uploader before opening file dialog
+      fileInput.click();
+    });
+    
+    // Focus the uploader area when clicking anywhere else in the box
+    uploader.addEventListener('click', () => uploader.focus());
+
     fileInput.addEventListener('change', (e) => {
       if (e.target.files.length) sendImage(e.target.files[0]);
       // Reset input value to allow uploading the same file again if needed
