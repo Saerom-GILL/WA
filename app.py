@@ -235,18 +235,26 @@ def render_inspection_ui(category):
 
     st.subheader(f"[{category}] 검사")
     
-    image = None
-    file_id = None
-
     # 업로더 컴포넌트 초기화를 위한 동적 키 관리
     uploader_key_name = f"uploader_key_{category}"
     if uploader_key_name not in st.session_state:
         st.session_state[uploader_key_name] = 0
 
-    # 단일 통합 업로더 UI 렌더링
-    file_data = custom_uploader(key=f"custom_uploader_{category}_{st.session_state[uploader_key_name]}")
+    file_data_key = f"file_data_{category}"
+    if file_data_key not in st.session_state:
+        st.session_state[file_data_key] = None
 
-    if file_data is not None:
+    image = None
+    file_id = None
+    file_data = st.session_state[file_data_key]
+
+    if file_data is None:
+        # 이미지가 없을 때만 단일 통합 업로더 UI 렌더링
+        uploaded_data = custom_uploader(key=f"custom_uploader_{category}_{st.session_state[uploader_key_name]}")
+        if uploaded_data is not None:
+            st.session_state[file_data_key] = uploaded_data
+            st.rerun()
+    else:
         try:
             # Base64 데이터에서 실제 이미지 추출
             base64_data = file_data["data"].split(",")[1]
@@ -266,10 +274,13 @@ def render_inspection_ui(category):
         with col_img2:
             if st.button("❌ 선택 취소", use_container_width=True, key=f"btn_cancel_{category}"):
                 st.session_state[uploader_key_name] += 1
+                st.session_state[file_data_key] = None
                 st.session_state.result_text = None
                 st.rerun()
 
-        st.image(image, use_container_width=True)
+        # use_container_width=False (기본값) 설정 시, 
+        # 작은 이미지는 원본 크기로 유지되고, 큰 이미지는 컨테이너 폭에 맞춰 자동으로 축소됩니다.
+        st.image(image)
 
         # 파일이 변경되면 이전 결과 초기화
         if 'current_file_id' not in st.session_state or st.session_state.current_file_id != file_id:
