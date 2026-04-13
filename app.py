@@ -224,7 +224,7 @@ def create_summary_image(text, original_image):
 
 def render_inspection_ui(category):
     # 뒤로 가기 버튼
-    if st.button("⬅️ 다른 카테고리 선택하기"):
+    if st.button("⬅️ 다른 유형 선택하기"):
         st.session_state.selected_category = None
         st.rerun()
 
@@ -277,7 +277,7 @@ def render_inspection_ui(category):
                 st.markdown(st.session_state.result_text)
                 st.markdown("---")
                 st.markdown("#### 📸 결과 캡처 이미지")
-                st.info("아래 버튼을 눌러 위변조 방지 패턴과 원본 이미지가 포함된 결과 문서를 다운로드하세요.")
+                st.info("아래 버튼을 눌러 검사 결과 이미지를 다운로드하세요.")
                 st.download_button(
                     label="저장하기",
                     data=st.session_state.img_bytes,
@@ -303,7 +303,7 @@ def render_inspection_ui(category):
 
                 # 중복 출력을 방지하고, 화면에 1~2단계 요약 결과만 한 번 표시
                 st.markdown(st.session_state.summary_text)
-                st.caption("ℹ️ 위 복사 버튼을 누르면 마크다운(별표 등)이 제거된 깔끔한 텍스트로 복사되어 바로 붙여넣기할 수 있습니다.")
+                st.caption("ℹ️ 위 복사 버튼을 누르면 텍스트가 복사되어 바로 붙여넣기할 수 있습니다.")
 
             elif category == '게시글 내 삽입 이미지':
                 st.markdown("### 📋 점검 결과")
