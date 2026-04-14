@@ -72,7 +72,7 @@ COMMON_OUTPUT_FORMAT_TEXT_EXISTS = """
 
 **2단계: 상세 분석 (전수 조사 리스트)**
 - 위반된 부분의 [위치/내용]과 [문제점]을 구체적으로 나열하십시오.
-- 위반 사항이 없다면 "특이사항 없음"이라고 적으십시오.
+- 만약 '✅ 적격' 판정이더라도 "특이사항 없음"으로 생략하지 말고, 주요 텍스트의 [위치/내용]과 [배경색/글자색]을 분석하여 명도 대비 기준을 충분히 충족하였음을 구체적으로 설명해 주십시오.
 
 **★ QR코드 발견 시 출력 양식 (매우 중요)**
 만약 이미지에 QR코드가 있다면, 반드시 아래 형식을 그대로 사용하여 출력하십시오:
@@ -115,12 +115,12 @@ def get_system_prompt(category):
 ---
 
 **(만약 [텍스트를 포함하는 이미지]로 분류된 경우, 아래 포맷으로 출력)**
-{COMMON_OUTPUT_FORMAT_TEXT_EXISTS.format(text_source_note="`※ 복사 후 '이미지 설명' 입력란에 입력하세요.`")}
+{COMMON_OUTPUT_FORMAT_TEXT_EXISTS.format(text_source_note="`※ 복사 후 '이미지 설명' 입력란에 붙여넣기 하세요.`")}
 
 ---
 
 **(만약 [텍스트를 포함하지 않는 이미지]로 분류된 경우, 아래 포맷으로 출력)**
-**1단계: 대체 텍스트 요약** `※ 복사 후 '이미지 설명' 입력란에 입력하세요.`
+**1단계: 대체 텍스트 요약** `※ 복사 후 '이미지 설명' 입력란에 붙여넣기 하세요.`
 - 시각장애인이 이미지를 보지 않고도 맥락을 이해할 수 있도록, 사진의 핵심 내용이나 현장의 분위기, 주요 피사체의 행동 등을 요약하여 제공하십시오.
 - 반드시 아래 코드 블록 안에 출력:
 ```text
@@ -294,7 +294,7 @@ def render_inspection_ui(category):
         with col_img1:
             st.markdown(f"**첨부된 파일:** `{file_data['name']}`")
         with col_img2:
-            if st.button("❌ 선택 취소", use_container_width=True, key=f"btn_cancel_{category}"):
+            if st.button("❌ 취소", use_container_width=True, key=f"btn_cancel_{category}"):
                 st.session_state[uploader_key_name] += 1
                 st.session_state[file_data_key] = None
                 st.session_state.result_text = None
