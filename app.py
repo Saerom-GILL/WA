@@ -385,9 +385,16 @@ def render_inspection_ui(category):
                         after_copy_label="✅ 복사 완료!"
                     )
 
+                # 화면 표출용 텍스트에서도 요약/타이틀 제거 (마크다운 유지)
+                display_lines = []
+                for line in st.session_state.summary_text.split('\n'):
+                    if "**메인 타이틀:**" not in line and "**사진 요약 (20자 이내):**" not in line:
+                        display_lines.append(line)
+                display_text = "\n".join(display_lines).strip()
+
                 # 중복 출력을 방지하고, 화면에 1~2단계 요약 결과만 한 번 표시
-                st.markdown(st.session_state.summary_text)
-                st.caption("ℹ️ 위 복사 버튼을 누르면 검사 결과 내용 아래에 파일명, 시각, 요약/타이틀 내용이 추가로 복사됩니다.")
+                st.markdown(display_text)
+                st.caption("ℹ️ 위 복사 버튼을 누르면 검사 결과 텍스트가 복사됩니다.")
 
             elif category == '게시글 내 삽입 이미지':
                 st.markdown("### 📋 점검 결과")
