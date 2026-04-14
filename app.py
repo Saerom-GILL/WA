@@ -4,6 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 import io
 import textwrap
 import re
+import datetime
 from st_copy_to_clipboard import st_copy_to_clipboard
 import streamlit.components.v1 as components
 import base64
@@ -140,8 +141,14 @@ def get_system_prompt(category):
 
 텍스트가 없으므로 특이사항 없음.
 
+**사진 요약 (20자 이내):** (사진에 대한 핵심 요약을 작성)
+
 **[출력 포맷: 텍스트를 포함하는 이미지]**
-텍스트가 있는 이미지라면, 아래 포맷을 따라 1단계부터 3단계까지 진행하십시오.
+텍스트가 있는 이미지라면, 아래 포맷을 따라 진행하십시오.
+먼저 첫 줄에 메인 타이틀을 작성하고, 그 다음 1단계부터 3단계까지 진행하십시오.
+
+**메인 타이틀:** (이미지의 가장 핵심이 되는 큰 제목을 여기에 작성)
+
 {COMMON_OUTPUT_FORMAT_TEXT_EXISTS.format(text_source_note="")}
 **(END OF OUTPUT)**
 """
@@ -347,20 +354,35 @@ def render_inspection_ui(category):
                 # 마크다운 기호 제거하여 화면에 보이는 텍스트(Plain Text) 형태로 변환
                 plain_text = st.session_state.summary_text.replace("**", "").replace("### ", "").replace("## ", "").replace("> ", "")
 
+                # 메인 타이틀 또는 사진 요약 추출
+                title_or_summary = "없음"
+                if "메인 타이틀:" in plain_text:
+                    title_or_summary = plain_text.split("메인 타이틀:")[1].split("\n")[0].strip()
+                elif "사진 요약 (20자 이내):" in plain_text:
+                    title_or_summary = plain_text.split("사진 요약 (20자 이내):")[1].split("\n")[0].strip()
+
+                kst = datetime.timezone(datetime.timedelta(hours=9))
+                current_time = datetime.datetime.now(kst).strftime("%Y-%m-%d %H:%M:%S")
+                filename = file_data['name'] if file_data else "알 수 없음"
+
+                # 최종 복사 텍스트 조합
+                prefix = f"[파일 이름] {filename}\n[검사 일시] {current_time}\n[요약/타이틀] {title_or_summary}\n\n"
+                final_copy_text = prefix + plain_text
+
                 # 결과 헤더와 복사 버튼을 한 줄에 배치하여 직관성 향상
                 col1, col2 = st.columns([0.8, 0.2])
                 with col1:
                     st.markdown("### 📋 점검 결과")
                 with col2:
                     st_copy_to_clipboard(
-                        text=plain_text,
+                        text=final_copy_text,
                         before_copy_label="📋 결과 복사",
                         after_copy_label="✅ 복사 완료!"
                     )
 
                 # 중복 출력을 방지하고, 화면에 1~2단계 요약 결과만 한 번 표시
                 st.markdown(st.session_state.summary_text)
-                st.caption("ℹ️ 위 복사 버튼을 누르면 텍스트가 복사되어 바로 붙여넣기할 수 있습니다.")
+                st.caption("ℹ️ 위 복사 버튼을 누르면 파일 정보, 시각, 요약 내용이 포함된 결과 텍스트가 복사됩니다.")
 
             elif category == '게시글 내 삽입 이미지':
                 st.markdown("### 📋 점검 결과")
