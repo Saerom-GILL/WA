@@ -354,20 +354,25 @@ def render_inspection_ui(category):
                 # 마크다운 기호 제거하여 화면에 보이는 텍스트(Plain Text) 형태로 변환
                 plain_text = st.session_state.summary_text.replace("**", "").replace("### ", "").replace("## ", "").replace("> ", "")
 
-                # 메인 타이틀 또는 사진 요약 추출
+                # 메인 타이틀 또는 사진 요약 추출 후 본문에서 제거
                 title_or_summary = "없음"
-                if "메인 타이틀:" in plain_text:
-                    title_or_summary = plain_text.split("메인 타이틀:")[1].split("\n")[0].strip()
-                elif "사진 요약 (20자 이내):" in plain_text:
-                    title_or_summary = plain_text.split("사진 요약 (20자 이내):")[1].split("\n")[0].strip()
+                new_lines = []
+                for line in plain_text.split('\n'):
+                    if line.startswith("메인 타이틀:"):
+                        title_or_summary = line.replace("메인 타이틀:", "").strip()
+                    elif line.startswith("사진 요약 (20자 이내):"):
+                        title_or_summary = line.replace("사진 요약 (20자 이내):", "").strip()
+                    else:
+                        new_lines.append(line)
+
+                plain_text = "\n".join(new_lines).strip()
 
                 kst = datetime.timezone(datetime.timedelta(hours=9))
                 current_time = datetime.datetime.now(kst).strftime("%Y-%m-%d %H:%M:%S")
                 filename = file_data['name'] if file_data else "알 수 없음"
 
-                # 최종 복사 텍스트 조합
-                prefix = f"[파일 이름] {filename}\n[검사 일시] {current_time}\n[요약/타이틀] {title_or_summary}\n\n"
-                final_copy_text = prefix + plain_text
+                # 최종 복사 텍스트 조합 (검사결과를 위에, 파일 정보 등을 아래에 라벨 없이)
+                final_copy_text = f"{plain_text}\n\n{filename}\n{current_time}\n{title_or_summary}"
 
                 # 결과 헤더와 복사 버튼을 한 줄에 배치하여 직관성 향상
                 col1, col2 = st.columns([0.8, 0.2])
@@ -382,7 +387,7 @@ def render_inspection_ui(category):
 
                 # 중복 출력을 방지하고, 화면에 1~2단계 요약 결과만 한 번 표시
                 st.markdown(st.session_state.summary_text)
-                st.caption("ℹ️ 위 복사 버튼을 누르면 파일 정보, 시각, 요약 내용이 포함된 결과 텍스트가 복사됩니다.")
+                st.caption("ℹ️ 위 복사 버튼을 누르면 검사 결과 내용 아래에 파일명, 시각, 요약/타이틀 내용이 추가로 복사됩니다.")
 
             elif category == '게시글 내 삽입 이미지':
                 st.markdown("### 📋 점검 결과")
