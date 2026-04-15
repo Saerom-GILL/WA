@@ -198,11 +198,12 @@ def create_summary_image(text, original_image):
                 wrapped_lines.append((wrapped, False))
             
     line_height = 28 # 줄간격 여유
-    text_height = len(wrapped_lines) * line_height + 150
+    # 텍스트가 시작되는 y좌표가 140(card_margin 30 + 110)이므로, 하단 여백을 충분히 주려면 200 이상을 더해야 함
+    text_height = len(wrapped_lines) * line_height + 200
     
     # 3. 전체 이미지 크기 계산 (폭을 1200으로 넓혀 텍스트 잘림 방지)
     img_width = 1200
-    img_height = max(text_height, h_size + 150)
+    img_height = max(text_height, h_size + 200)
 
     # 기본 배경 생성 (살짝 회색빛)
     img = Image.new('RGB', (img_width, img_height), color='#f4f6f8')
