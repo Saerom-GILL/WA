@@ -341,7 +341,7 @@ def render_inspection_ui(category):
                 st.markdown("### 📋 점검 결과")
                 st.markdown(st.session_state.result_text)
                 st.markdown("---")
-                st.markdown("#### 📸 결과 캡처 이미지")
+                st.markdown("#### 📸 결과 이미지")
                 st.info("아래 버튼을 눌러 검사 결과 이미지를 다운로드하세요.")
                 st.download_button(
                     label="저장하기",
