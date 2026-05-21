@@ -2,7 +2,7 @@ name: Keep Streamlit Alive
 
 on:
   schedule:
-    - cron: '0 0 * * *' # 매일 자정(UTC)에 실행 (한국 시간 기준 오전 9시)
+    - cron: '21 21 * * *' # 한국 시간 오전 6시에 실행 (UTC 기준 전날 21:00)
   workflow_dispatch: # 버튼을 눌러서 수동으로도 실행할 수 있게 해주는 옵션
 
 jobs:
