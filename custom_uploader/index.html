@@ -80,41 +80,57 @@
       font-weight: 600;
     }
 
-    .divider {
-      display: flex;
-      align-items: center;
-      width: 50%;
-      margin: 1.5rem 0;
-      color: var(--text-color);
-      opacity: 0.5;
-      font-size: 0.9rem;
-    }
-
-    .divider::before, .divider::after {
-      content: "";
-      flex: 1;
-      border-bottom: 1px solid #88888888;
-    }
-
-    .divider::before { margin-right: 15px; }
-    .divider::after { margin-left: 15px; }
-    
-    .subtext-box {
-      font-size: 0.95rem;
-      color: var(--text-color);
-      opacity: 0.8;
-      display: inline-flex;
-      align-items: center;
-      background-color: var(--background-color);
-      padding: 0.5rem 1rem;
-      border-radius: 1.5rem;
-      border: 1px solid #88888844;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-
     input[type="file"] {
       display: none;
     }
+
+    .upload-limits {
+      margin-top: 1rem;
+      padding: 18px 22px;
+      border: 1px solid #88888855;
+      border-left: 4px solid var(--primary-color);
+      border-radius: 10px;
+      background: var(--background-color);
+      font-size: 1rem;
+      font-weight: 600;
+      text-align: left;
+      line-height: 1.8;
+      overflow-wrap: anywhere;
+    }
+    .upload-limits h3 { margin: 0 0 10px; font-size: 1.1rem; font-weight: 800; }
+    .upload-limits ul { list-style: none; margin: 0; padding: 0; }
+    .upload-limits li { margin: 5px 0; }
+    .upload-limits strong { font-weight: 800; text-decoration: underline; text-underline-offset: 4px; }
+
+    dialog {
+      width: min(440px, calc(100% - 48px));
+      max-height: calc(100% - 48px);
+      box-sizing: border-box;
+      padding: 24px;
+      border: 1px solid #88888844;
+      border-radius: 16px;
+      background: var(--background-color);
+      color: var(--text-color);
+      box-shadow: 0 16px 48px #00000033;
+      text-align: left;
+      overflow: auto;
+    }
+    dialog::backdrop { background: #00000066; }
+    dialog h2 { margin: 0 0 16px; font-size: 1.2rem; }
+    dialog p { white-space: pre-line; overflow-wrap: anywhere; line-height: 1.7; }
+    dialog button {
+      display: block;
+      margin: 20px 0 0 auto;
+      padding: 10px 28px;
+      border: 1px solid #88888888;
+      border-radius: 8px;
+      background: var(--secondary-background-color);
+      color: var(--text-color);
+      cursor: pointer;
+      font: inherit;
+      font-weight: 600;
+    }
+    dialog button:focus-visible { outline: 3px solid var(--primary-color); outline-offset: 3px; }
 
     .spinner {
       display: none;
@@ -140,9 +156,7 @@
       display: block;
     }
     
-    .uploader-box.loading .clickable-area, 
-    .uploader-box.loading .divider, 
-    .uploader-box.loading .subtext-box {
+    .uploader-box.loading .clickable-area {
       display: none;
     }
   </style>
@@ -151,24 +165,40 @@
   <div id="uploader" class="uploader-box" tabindex="0">
     <div class="spinner"></div>
     <div class="loading-text">⏳ 이미지를 첨부하고 있습니다...</div>
-    <div id="clickable-area" class="clickable-area">
+    <div id="clickable-area" class="clickable-area" role="button" tabindex="0" aria-label="이미지 파일 선택">
       <div class="icon">
         <svg focusable="false" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.36 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"></path></svg>
       </div>
       <div class="text">여기로 이미지를 드래그하거나 <span>파일을 업로드</span> 하세요.</div>
     </div>
-    <div class="divider">또는</div>
-    <div class="subtext-box">
-      📋 클립보드 이미지 붙여넣기 (Ctrl+V / ⌘+V)
-    </div>
     <input type="file" id="fileInput" accept="image/*" />
+    <section id="upload-limits" class="upload-limits" aria-label="이미지 첨부 기준">
+      <h3>이미지 첨부 기준</h3>
+      <ul>
+        <li id="limit-square" hidden>✔️ <strong>정방형(가로=세로)만 가능</strong></li>
+        <li>✔️ 크기 제한: <strong id="limit-dimensions">확인 중...</strong></li>
+        <li>✔️ 용량 제한: <strong id="limit-size">확인 중...</strong></li>
+      </ul>
+      <p id="limit-tip" hidden></p>
+    </section>
+
   </div>
 
+  <dialog id="upload-dialog" aria-labelledby="upload-dialog-title" aria-describedby="upload-dialog-message">
+    <h2 id="upload-dialog-title">이미지를 첨부할 수 없습니다</h2>
+    <p id="upload-dialog-message"></p>
+    <form method="dialog"><button autofocus>확인</button></form>
+  </dialog>
+
   <script>
+    let uploadLimits = null;
+    let busy = false;
+
     function sendValueToStreamlit(value) {
       window.parent.postMessage({
         isStreamlitMessage: true,
         type: "streamlit:setComponentValue",
+        dataType: "json",
         value: value,
       }, "*");
     }
@@ -177,7 +207,7 @@
       window.parent.postMessage({
         isStreamlitMessage: true,
         type: "streamlit:setFrameHeight",
-        height: document.body.scrollHeight,
+        height: document.getElementById('upload-dialog').open ? Math.max(460, document.body.scrollHeight) : document.body.scrollHeight,
       }, "*");
     }
 
@@ -190,7 +220,17 @@
 
     // Listen for messages from Streamlit
     window.addEventListener("message", function(event) {
-      if (event.data.type === "streamlit:render") {
+      if (event.source === window.parent && event.data?.type === "streamlit:render") {
+        uploadLimits = event.data.args?.limits || null;
+        if (uploadLimits) {
+          document.getElementById('limit-square').hidden = !uploadLimits.square;
+          document.getElementById('limit-dimensions').textContent = uploadLimits.square
+            ? `가로·세로 ${uploadLimits.maxWidth}px 이하`
+            : `가로 ${uploadLimits.maxWidth}px · 세로 ${uploadLimits.maxHeight}px 이하`;
+          document.getElementById('limit-size').textContent = `${uploadLimits.sizeLabel} 이하`;
+          document.getElementById('limit-tip').textContent = uploadLimits.tip || '';
+          document.getElementById('limit-tip').hidden = !uploadLimits.tip;
+        }
         // Streamlit 테마 정보를 추출하여 CSS 변수로 설정 (다크/라이트 모드 자동 대응)
         if (event.data.theme) {
           const theme = event.data.theme;
@@ -204,30 +244,125 @@
       }
     });
 
-    function sendImage(file) {
-      if (!file || !file.type.startsWith('image/')) return;
-
-      // 로딩 UI 활성화
+    function setLoading(loading) {
+      busy = loading;
       const uploader = document.getElementById('uploader');
-      uploader.classList.add('loading');
-      uploader.style.pointerEvents = 'none';
+      uploader.classList.toggle('loading', loading);
+      uploader.style.pointerEvents = loading ? 'none' : 'auto';
+      uploader.setAttribute('aria-busy', String(loading));
+      setFrameHeight();
+    }
 
-      const reader = new FileReader();
-      reader.onload = function(e) {
+    function showError(message, title = '이미지 첨부 오류') {
+      if (!message) return;
+      const dialog = document.getElementById('upload-dialog');
+      document.getElementById('upload-dialog-title').textContent = title;
+      document.getElementById('upload-dialog-message').textContent = message;
+      if (!dialog.open) dialog.showModal();
+      setFrameHeight();
+    }
+
+    function formatFileSize(bytes) {
+      const unit = bytes >= 1024 * 1024 ? 'MB' : 'KB';
+      const divisor = unit === 'MB' ? 1024 * 1024 : 1024;
+      return `${(Math.ceil(bytes / divisor * 100) / 100).toFixed(2)}${unit}`;
+    }
+
+    function readDimensions(file) {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const image = new Image();
+        const timer = setTimeout(() => finish(new Error('이미지 크기를 확인하지 못했습니다. 다른 파일로 다시 시도해 주세요.')), 10000);
+        function finish(error) {
+          clearTimeout(timer);
+          image.onload = image.onerror = null;
+          URL.revokeObjectURL(url);
+          if (error) reject(error);
+          else resolve({width: image.naturalWidth, height: image.naturalHeight});
+        }
+        image.onload = () => finish();
+        image.onerror = () => finish(new Error('이미지를 읽을 수 없습니다. 정상적인 이미지 파일을 선택해 주세요.'));
+        image.src = url;
+      });
+    }
+
+    function readDataURL(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('파일 읽기에 실패했습니다. 다시 첨부해 주세요.'));
+        reader.onabort = () => reject(new Error('파일 읽기가 취소되었습니다. 다시 첨부해 주세요.'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function sendImage(file) {
+      if (!file || busy || document.getElementById('upload-dialog').open) return;
+      showError('');
+      if (!uploadLimits) {
+        showError('첨부 기준을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');
+        return;
+      }
+      const limits = uploadLimits;
+      if (!file.type.startsWith('image/')) {
+        showError('이미지 파일만 첨부할 수 있습니다.');
+        return;
+      }
+      const sizeExceeded = file.size > limits.maxBytes;
+      const sizeDetail = `허용 용량: ${limits.sizeLabel} 이하\n현재 용량: ${formatFileSize(file.size)}`;
+      setLoading(true);
+      try {
+        // 용량 초과 파일도 로컬에서 크기를 확인해 두 제한을 함께 안내합니다.
+        // 모든 검사가 끝나기 전에는 Base64 변환이나 서버 전송을 하지 않습니다.
+        let dimensions;
+        try {
+          dimensions = await readDimensions(file);
+        } catch (error) {
+          if (!sizeExceeded) throw error;
+          setLoading(false);
+          showError(`${sizeDetail}\n\n이미지 크기는 확인할 수 없습니다.`, '이미지 용량 제한 초과');
+          return;
+        }
+        const {width, height} = dimensions;
+        if (!width || !height) throw new Error('이미지 크기를 확인할 수 없습니다.');
+        const dimensionsExceeded = width > limits.maxWidth || height > limits.maxHeight;
+        const notSquare = limits.square && width !== height;
+        const details = [];
+        if (dimensionsExceeded || notSquare) {
+          const rules = [];
+          if (dimensionsExceeded) rules.push(`허용 크기: 가로 ${limits.maxWidth}px · 세로 ${limits.maxHeight}px 이하`);
+          if (notSquare) rules.push('정방형(가로=세로)만 첨부 가능');
+          details.push(`${rules.join('\n')}\n현재 크기: 가로 ${width}px · 세로 ${height}px`);
+        }
+        if (sizeExceeded) details.push(sizeDetail);
+        if (details.length) {
+          const reasons = [];
+          if (dimensionsExceeded) reasons.push('크기');
+          if (notSquare) reasons.push('정방형');
+          if (sizeExceeded) reasons.push('용량');
+          const title = notSquare
+            ? `이미지 ${reasons.join('·')} 기준 미충족`
+            : `이미지 ${reasons.join('·')} 제한 초과`;
+          setLoading(false);
+          showError(details.join('\n\n'), title);
+          return;
+        }
+        const data = await readDataURL(file);
         sendValueToStreamlit({
           name: file.name,
           type: file.type,
           size: file.size,
-          data: e.target.result
+          data: data
         });
-        
-        // 파이썬/Streamlit 단에서 렌더링되는데 걸리는 시간 동안 상태 유지 (안전장치)
+        // 서버 응답이 없더라도 다시 시도할 수 있도록 로딩을 해제합니다.
         setTimeout(() => {
-          uploader.classList.remove('loading');
-          uploader.style.pointerEvents = 'auto';
+          setLoading(false);
+          showError('첨부가 완료되지 않았습니다. 연결 상태를 확인하고 다시 시도해 주세요.');
         }, 5000);
-      };
-      reader.readAsDataURL(file);
+      } catch (error) {
+        setLoading(false);
+        showError(error.message || '이미지를 첨부할 수 없습니다.');
+      }
     }
 
     const uploader = document.getElementById('uploader');
@@ -239,6 +374,13 @@
       fileInput.click();
     });
     
+    clickableArea.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        fileInput.click();
+      }
+    });
+
     // Focus the uploader area when clicking anywhere else in the box
     uploader.addEventListener('click', () => uploader.focus());
 
@@ -262,22 +404,11 @@
       if (e.dataTransfer.files.length) sendImage(e.dataTransfer.files[0]);
     });
 
-    // Listen for paste anywhere in the document
-    document.addEventListener('paste', (e) => {
-      const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-      for (let item of items) {
-        if (item.type.indexOf("image") !== -1) {
-          const file = item.getAsFile();
-          if (file) {
-            // Some browsers don't give a proper name to pasted files, so we rename it
-            const newFile = new File([file], "pasted_image_" + Date.now() + ".png", {type: file.type});
-            sendImage(newFile);
-          }
-          break;
-        }
-      }
+    document.getElementById('upload-dialog').addEventListener('close', () => {
+      setFrameHeight();
+      clickableArea.focus();
     });
-    
+
     // Initial height setting
     setTimeout(setFrameHeight, 100);
   </script>

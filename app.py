@@ -95,8 +95,17 @@ COMMON_CLASSIFICATION_RULE = """
 - **[텍스트를 포함하지 않는 이미지]**: 일반적인 행사 사진, 풍경 사진, 인물 사진 등. (주의: 사진 배경에 우연히 찍힌 현수막이나 간판의 텍스트가 있다고 해서 '텍스트를 포함하는 이미지'로 분류해서는 안 됩니다.)
 """
 
+SUMMARY_IMAGE_CATEGORIES = ('팝업', '대형 배너')
+UPLOAD_LIMITS = {
+    '팝업': dict(maxWidth=520, maxHeight=800, maxBytes=500 * 1024, sizeLabel='500KB', square=False),
+    '대형 배너': dict(maxWidth=1920, maxHeight=800, maxBytes=1024 * 1024, sizeLabel='1MB', square=False),
+    '썸네일': dict(maxWidth=500, maxHeight=500, maxBytes=200 * 1024, sizeLabel='200KB', square=True),
+    '게시글 내 삽입 이미지': dict(maxWidth=1200, maxHeight=1800, maxBytes=1024 * 1024, sizeLabel='1MB', square=False,
+                         tip='💡 세로 길이 1800px을 초과하는 긴 이미지는 일정 크기로 나눠서 사용 권장'),
+}
+
 def get_system_prompt(category):
-    if category == '팝업 / 대형 배너':
+    if category in SUMMARY_IMAGE_CATEGORIES:
         return COMMON_RULES + f"""
 목표: 이미지 내 텍스트를 끝까지 완전하게 추출하고, 명도 대비 위반 및 QR코드 접근성을 전수 조사하는 것입니다.
 
@@ -161,7 +170,11 @@ st.info("💡 최신 Gemini 3.1 Pro 기반 정밀 분석 모드가 적용되었�
 if 'selected_category' not in st.session_state:
     st.session_state.selected_category = None
 
-def create_summary_image(text, original_image):
+# 기존 통합 메뉴를 선택한 세션은 새 카테고리를 다시 선택하도록 합니다.
+if st.session_state.selected_category == '팝업 / 대형 배너':
+    st.session_state.selected_category = None
+
+def create_summary_image(text, original_image, category):
     font_path = "NotoSansKR.otf"
     try:
         font_title = ImageFont.truetype(font_path, 24)
@@ -220,7 +233,7 @@ def create_summary_image(text, original_image):
     )
 
     # 워터마크 패턴 (카드 위, 텍스트 아래에 촘촘하게 깔리도록 수정)
-    watermark_text = " 경기도평생교육진흥원 정보접근성 검사기 - 팝업/대형배너 검사 결과 "
+    watermark_text = f" 경기도평생교육진흥원 정보접근성 검사기 - {category} 검사 결과 "
     watermark_color = (242, 242, 245) # 텍스트를 방해하지 않는 매우 연한 색상
 
     # 간격을 2배 더 촘촘하게 (y축 15, x축 350 간격)
@@ -231,7 +244,7 @@ def create_summary_image(text, original_image):
             d.text((x + offset, y), watermark_text, font=font_watermark, fill=watermark_color)
 
     # 제목
-    d.text((card_margin + 40, card_margin + 40), "팝업 / 대형 배너 검사 결과", font=font_title, fill='#1e1e1e')
+    d.text((card_margin + 40, card_margin + 40), f"{category} 검사 결과", font=font_title, fill='#1e1e1e')
     d.line([(card_margin + 40, card_margin + 80), (img_width - card_margin - 40, card_margin + 80)], fill="#eeeeee", width=2)
 
     # 이미지 삽입
@@ -273,7 +286,10 @@ def render_inspection_ui(category):
 
     if file_data is None:
         # 이미지가 없을 때만 단일 통합 업로더 UI 렌더링
-        uploaded_data = custom_uploader(key=f"custom_uploader_{category}_{st.session_state[uploader_key_name]}")
+        uploaded_data = custom_uploader(
+            limits=UPLOAD_LIMITS[category],
+            key=f"custom_uploader_{category}_{st.session_state[uploader_key_name]}",
+        )
         if uploaded_data is not None:
             st.session_state[file_data_key] = uploaded_data
             st.rerun()
@@ -328,8 +344,8 @@ def render_inspection_ui(category):
                     summary_text = result_text.split("**3단계:")[0] if "**3단계:" in result_text else result_text
                     st.session_state.summary_text = summary_text
 
-                    if category == '팝업 / 대형 배너':
-                        st.session_state.img_bytes = create_summary_image(summary_text, image)
+                    if category in SUMMARY_IMAGE_CATEGORIES:
+                        st.session_state.img_bytes = create_summary_image(summary_text, image, category)
 
                 except Exception as e:
                     st.error(f"오류 발생: {e}")
@@ -337,7 +353,7 @@ def render_inspection_ui(category):
 
         # 세션에 결과가 있으면 화면에 렌더링
         if st.session_state.result_text is not None:
-            if category == '팝업 / 대형 배너':
+            if category in SUMMARY_IMAGE_CATEGORIES:
                 st.markdown("### 📋 점검 결과")
                 st.markdown(st.session_state.result_text)
                 st.markdown("---")
@@ -405,22 +421,18 @@ if st.session_state.selected_category is None:
     st.markdown("### 📌 검사할 콘텐츠 유형을 선택하세요")
     st.write("진행하고자 하는 정보접근성 검사 항목을 아래에서 선택해 주세요.")
     
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.button("🖼️ 팝업 / 대형 배너", use_container_width=True):
-            st.session_state.selected_category = '팝업 / 대형 배너'
-            st.rerun()
-
-    with col2:
-        if st.button("📱 썸네일", use_container_width=True):
-            st.session_state.selected_category = '썸네일'
-            st.rerun()
-
-    with col3:
-        if st.button("📝 게시글 내 삽입 이미지", use_container_width=True):
-            st.session_state.selected_category = '게시글 내 삽입 이미지'
-            st.rerun()
+    categories = [
+        ('🖼️', '팝업'),
+        ('🏞️', '대형 배너'),
+        ('📱', '썸네일'),
+        ('📝', '게시글 내 삽입 이미지'),
+    ]
+    for row_start in range(0, len(categories), 2):
+        for column, (icon, category) in zip(st.columns(2), categories[row_start:row_start + 2]):
+            with column:
+                if st.button(f"{icon} {category}", use_container_width=True):
+                    st.session_state.selected_category = category
+                    st.rerun()
 
 else:
     render_inspection_ui(st.session_state.selected_category)
