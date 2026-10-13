@@ -309,6 +309,7 @@
         return;
       }
       const sizeExceeded = file.size > limits.maxBytes;
+      const retryGuidance = '기준에 맞춰 이미지 수정 후 검사 수행 해주세요.';
       const sizeDetail = `허용 용량: ${limits.sizeLabel} 이하\n현재 용량: ${formatFileSize(file.size)}`;
       setLoading(true);
       try {
@@ -320,7 +321,7 @@
         } catch (error) {
           if (!sizeExceeded) throw error;
           setLoading(false);
-          showError(`${sizeDetail}\n\n이미지 크기는 확인할 수 없습니다.`, '이미지 용량 제한 초과');
+          showError(`${sizeDetail}\n\n이미지 크기는 확인할 수 없습니다.\n\n${retryGuidance}`, '이미지 용량 제한 초과');
           return;
         }
         const {width, height} = dimensions;
@@ -344,7 +345,7 @@
             ? `이미지 ${reasons.join('·')} 기준 미충족`
             : `이미지 ${reasons.join('·')} 제한 초과`;
           setLoading(false);
-          showError(details.join('\n\n'), title);
+          showError([...details, retryGuidance].join('\n\n'), title);
           return;
         }
         const data = await readDataURL(file);

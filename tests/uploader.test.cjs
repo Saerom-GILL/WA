@@ -117,7 +117,7 @@ test('size-only rejection excludes dimensions; rounding makes excess visible',as
   const h=setup(limitsByCategory['팝업']);
   await h.context.sendImage(file(512001));
   assert.equal(h.title(),'이미지 용량 제한 초과');
-  assert.equal(h.error(),'허용 용량: 500KB 이하\n현재 용량: 500.01KB');
+  assert.equal(h.error(),'허용 용량: 500KB 이하\n현재 용량: 500.01KB\n\n기준에 맞춰 이미지 수정 후 검사 수행 해주세요.');
   assert.equal(h.counts().reads,0);
 });
 test('combined rejection shows both failures without sending data',async()=>{
